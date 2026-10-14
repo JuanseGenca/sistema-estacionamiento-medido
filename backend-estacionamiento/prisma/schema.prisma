@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model conductor {
+  id            Int             @id @default(autoincrement())
+  saldo         Float           @default(0)
+  usuarioId     Int             @unique(map: "Conductor_usuarioId_key")
+  usuario       usuario         @relation(fields: [usuarioId], references: [id], map: "Conductor_usuarioId_fkey")
+  vehiculo      conductorvehiculo[]
+  sesionestacionamiento sesionestacionamiento[]
+  operacionpago operacionpago[]
+}
+
+model configuracionsistema {
+  id                Int      @id @default(1)
+  hora_inicio_cobro String   @default("08:00")
+  hora_fin_cobro    String   @default("20:00")
+  actualizada_en    DateTime @updatedAt
+}
+
+model inspector {
+  id        Int     @id @default(autoincrement())
+  legajo    String  @unique(map: "Inspector_legajo_key")
+  usuarioId Int     @unique(map: "Inspector_usuarioId_key")
+  usuario   usuario @relation(fields: [usuarioId], references: [id], map: "Inspector_usuarioId_fkey")
+  multa     multa[]
+}
+
+model multa {
+  id_multa    Int          @id @default(autoincrement())
+  fecha       DateTime     @default(now())
+  ubicacion   String
+  monto       Float
+  estado      multa_estado @default(PENDIENTE)
+  inspectorId Int
+  patente     String
+  inspector   inspector    @relation(fields: [inspectorId], references: [id], map: "Multa_inspectorId_fkey")
+  vehiculo    vehiculo     @relation(fields: [patente], references: [patente], map: "Multa_patente_fkey")
+  operacionpago operacionpago[]
+
+  @@index([inspectorId], map: "Multa_inspectorId_fkey")
+  @@index([patente], map: "Multa_patente_fkey")
+}
+
+model operacionpago {
+  id                         Int                  @id @default(autoincrement())
+  tipo                       operacionpago_tipo
+  estado                     operacionpago_estado @default(PENDIENTE)
+  monto                      Float
+  fecha_creacion             DateTime             @default(now())
+  fecha_actualizacion        DateTime             @updatedAt
+  conductorId                Int
+  multaId                    Int?
+  mercadoPagoPreferenceId    String?              @unique(map: "OperacionPago_mercadoPagoPreferenceId_key")
+  mercadoPagoPaymentId       String?              @unique(map: "OperacionPago_mercadoPagoPaymentId_key")
+  conductor                  conductor            @relation(fields: [conductorId], references: [id], map: "OperacionPago_conductorId_fkey")
+  multa                      multa?               @relation(fields: [multaId], references: [id_multa], map: "OperacionPago_multaId_fkey")
+
+  @@index([conductorId], map: "OperacionPago_conductorId_fkey")
+  @@index([multaId], map: "OperacionPago_multaId_fkey")
+}
+
+model sesionestacionamiento {
+  id                        Int       @id @default(autoincrement())
+  fecha_inicio              DateTime  @default(now())
+  fecha_fin                 DateTime?
+  costo_cobrado             Float?
+  patente                   String
+  zonaId                    Int
+  conductorId               Int
+  vehiculo                  vehiculo  @relation(fields: [patente], references: [patente], map: "SesionEstacionamiento_patente_fkey")
+  zona                      zona      @relation(fields: [zonaId], references: [id], map: "SesionEstacionamiento_zonaId_fkey")
+  conductor                 conductor @relation(fields: [conductorId], references: [id], map: "SesionEstacionamiento_conductorId_fkey")
+
+  @@index([conductorId], map: "SesionEstacionamiento_conductorId_fkey")
+  @@index([patente], map: "SesionEstacionamiento_patente_fkey")
+  @@index([zonaId], map: "SesionEstacionamiento_zonaId_fkey")
+}
+
+model usuario {
+  id        Int         @id @default(autoincrement())
+  dni       String      @unique(map: "Usuario_dni_key")
+  email     String      @unique(map: "Usuario_email_key")
+  rol       usuario_rol @default(CONDUCTOR)
+  clerk_id  String      @unique(map: "Usuario_clerk_id_key")
+  conductor conductor?
+  inspector inspector?
+}
+
+model vehiculo {
+  patente               String                  @id
+  multa                 multa[]
+  sesionestacionamiento sesionestacionamiento[]
+  conductores           conductorvehiculo[]
+}
+
+model conductorvehiculo {
+  conductorId Int
+  patente     String
+  fecha_asociacion DateTime @default(now())
+  conductor   conductor @relation(fields: [conductorId], references: [id], map: "ConductorVehiculo_conductorId_fkey")
+  vehiculo    vehiculo  @relation(fields: [patente], references: [patente], map: "ConductorVehiculo_patente_fkey")
+
+  @@id([conductorId, patente])
+  @@index([patente], map: "ConductorVehiculo_patente_fkey")
+}
+
+model zona {
+  id                    Int                     @id @default(autoincrement())
+  nombre                String
+  calles                String
+  coordenadas           Json                    @default("[]")
+  precio_hora           Float
+  sesionestacionamiento sesionestacionamiento[]
+}
+
+enum usuario_rol {
+  CONDUCTOR
+  INSPECTOR
+  ADMINISTRADOR
+}
+
+enum multa_estado {
+  PENDIENTE
+  PAGADA
+  ANULADA
+}
+
+enum operacionpago_tipo {
+  CARGA_SALDO
+  PAGO_MULTA
+}
+
+enum operacionpago_estado {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  FALLIDA
+}
